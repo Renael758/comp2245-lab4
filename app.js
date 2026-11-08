@@ -3,12 +3,16 @@ const form = document.querySelector('form');
 
 const subjectList = form.elements.subject;
 
+const availableCheckbox = form.elements.available;
+
+const searchButton = form.querySelector('button[type="submit"]');
+
 const status = document.querySelector('#status');
 
 const tableBody = document.querySelector('#results tbody');
 
 
-// Load the subjects
+// Load subjects from the database
 async function loadSubjects() {
 
     const response = await fetch('subjects.php');
@@ -34,91 +38,120 @@ async function loadSubjects() {
 }
 
 
-// Search for books
+// Search and display books
 async function searchBooks() {
 
-    const params = new URLSearchParams(new FormData(form));
+    // Disable the Search button
+    searchButton.disabled = true;
 
-    const response = await fetch(`books.php?${params}`);
+    status.textContent = 'Searching…';
 
-    if (!response.ok) {
-        throw new Error('Could not load books');
-    }
+    try {
 
-    const books = await response.json();
+        // Collect the form information
+        const params = new URLSearchParams(new FormData(form));
 
+        // Fetch the books
+        const response = await fetch(`books.php?${params}`);
 
-    // Clear the existing results
-    tableBody.replaceChildren();
+        if (!response.ok) {
+            throw new Error('Could not load books');
+        }
 
-
-    // Create a row for every book
-    books.forEach(book => {
-
-        const row = document.createElement('tr');
-
-        const title = document.createElement('td');
-        title.textContent = book.title;
-
-        const author = document.createElement('td');
-        author.textContent = book.author;
-
-        const year = document.createElement('td');
-        year.textContent = book.year;
-
-        const subject = document.createElement('td');
-        subject.textContent = book.subject;
-
-        const availability = document.createElement('td');
-
-        availability.textContent =
-            `${book.available} of ${book.copies}`;
+        const books = await response.json();
 
 
-        // Mark unavailable books in red
-        if (Number(book.available) === 0) {
-            availability.classList.add('out');
+        // Clear previous results
+        tableBody.replaceChildren();
+
+
+        // Display each book
+        books.forEach(book => {
+
+            const row = document.createElement('tr');
+
+            const title = document.createElement('td');
+            title.textContent = book.title;
+
+            const author = document.createElement('td');
+            author.textContent = book.author;
+
+            const year = document.createElement('td');
+            year.textContent = book.year;
+
+            const subject = document.createElement('td');
+            subject.textContent = book.subject;
+
+            const availability = document.createElement('td');
+
+            availability.textContent =
+                `${book.available} of ${book.copies}`;
+
+
+            // Highlight unavailable books
+            if (Number(book.available) === 0) {
+
+                availability.classList.add('out');
+
+            }
+
+
+            // Add cells to the row
+            row.append(
+                title,
+                author,
+                year,
+                subject,
+                availability
+            );
+
+            tableBody.append(row);
+
+        });
+
+
+        // Update the status message
+        if (books.length === 0) {
+
+            status.textContent = 'No books match your search.';
+
+        } else {
+
+            status.textContent =
+                `${books.length} book${books.length === 1 ? '' : 's'} found.`;
+
         }
 
 
-        // Add the cells to the row
-        row.append(
-            title,
-            author,
-            year,
-            subject,
-            availability
-        );
+    } catch (error) {
 
-        // Add the row to the table
-        tableBody.append(row);
-
-    });
-
-
-    // Display the number of results
-    if (books.length === 0) {
-
-        status.textContent = 'No books match your search.';
-
-    } else {
+        // Clear the results if something fails
+        tableBody.replaceChildren();
 
         status.textContent =
-            `${books.length} book${books.length === 1 ? '' : 's'} found.`;
+            "Couldn't load the books. Please try again.";
+
+        console.error(error);
+
+
+    } finally {
+
+        // Enable the Search button again
+        searchButton.disabled = false;
 
     }
 
 }
 
 
-// Load subjects and books when the page loads
+// Load the subjects when the page opens
 loadSubjects().catch(error => {
     console.error(error);
 });
 
-searchBooks().catch(error => {
-    console.error(error);
-});
+
+// Load all books when the page opens
+searchBooks();
 
 
 // Search when the form is submitted
@@ -126,8 +159,22 @@ form.addEventListener('submit', event => {
 
     event.preventDefault();
 
-    searchBooks().catch(error => {
-        console.error(error);
-    });
+    searchBooks();
+
+});
+
+
+// Automatically search when the subject changes
+subjectList.addEventListener('change', () => {
+
+    searchBooks();
+
+});
+
+
+// Automatically search when availability changes
+availableCheckbox.addEventListener('change', () => {
+
+    searchBooks();
 
 });
